@@ -47,3 +47,40 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+      deploy-to-ec2:
+    name: Deploy to AWS EC2
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy application to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: DOCKERHUB_USERNAME
+          script: |
+            set -e
+
+            if ! command -v docker >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install -y docker.io
+            fi
+
+            sudo systemctl enable --now docker
+
+            sudo docker pull "$DOCKERHUB_USERNAME/automated-docker-cicd:latest"
+
+            sudo docker rm -f automated-docker-cicd || true
+
+            sudo docker run -d \
+              --name automated-docker-cicd \
+              --restart unless-stopped \
+              -p 80:80 \
+              "$DOCKERHUB_USERNAME/automated-docker-cicd:latest"
+
+            sudo docker ps
