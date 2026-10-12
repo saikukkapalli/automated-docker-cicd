@@ -47,7 +47,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-      deploy-to-ec2:
+
+  deploy-to-ec2:
     name: Deploy to AWS EC2
     needs: build-and-push
     if: github.ref == 'refs/heads/main'
