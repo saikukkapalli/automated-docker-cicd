@@ -1,0 +1,14 @@
+# SSL certificates and private keys
+compose-ssl-test/certs/
+*.pem
+*.key
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies and logs
+node_modules/
+*.log
+*.swp

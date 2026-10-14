@@ -1,12 +1,10 @@
 
-name: Docker Compose CI/CD
+name: Docker CI/CD
 
 on:
   push:
     branches:
       - main
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
 
 permissions:
@@ -38,9 +36,8 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha
-            type=semver,pattern={{version}}
 
-      - name: Build and push image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -49,27 +46,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   deploy-to-ec2:
-    name: Deploy with Docker Compose
+    name: Deploy HTTPS Stack to AWS EC2
     needs: build-and-push
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
-
-      - name: Copy Compose configuration to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "compose-ssl-test/compose.yaml,compose-ssl-test/nginx.conf"
-          target: "/home/ubuntu/compose-ssl-test"
-          strip_components: 1
-          overwrite: true
-
-      - name: Deploy application
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -81,16 +64,22 @@ jobs:
           script: |
             set -eu
 
-            cd /home/ubuntu/compose-ssl-test
+            cd /home/ubuntu/automated-docker-cicd
+            git fetch origin main
+            git reset --hard origin/main
 
+            cd compose-ssl-test
             export DOCKERHUB_USERNAME
 
-            sudo systemctl enable --now docker
-
-            sudo docker compose config
-
-            sudo docker compose pull
+            sudo --preserve-env=DOCKERHUB_USERNAME docker compose config --quiet
+            sudo docker compose pull app
             sudo docker compose up -d --remove-orphans
 
-            sudo docker compose ps
-            sudo docker compose logs --tail=30 nginx
+            sudo docker compose exec -T nginx nginx -t
+
+            curl --fail --silent --show-error \
+              --retry 5 --retry-delay 2 \
+              https://sai.pranat.online/ \
+              --output /dev/null
+
+            echo "HTTPS deployment verified successfully."
