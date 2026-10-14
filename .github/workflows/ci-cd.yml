@@ -72,8 +72,8 @@ jobs:
             export DOCKERHUB_USERNAME
 
             sudo --preserve-env=DOCKERHUB_USERNAME docker compose config --quiet
-            sudo docker compose pull app
-            sudo docker compose up -d --remove-orphans
+            sudo --preserve-env=DOCKERHUB_USERNAME docker compose pull app
+            sudo --preserve-env=DOCKERHUB_USERNAME docker compose up -d --remove-orphans
 
             sudo docker compose exec -T nginx nginx -t
 
